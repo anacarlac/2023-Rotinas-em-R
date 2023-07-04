@@ -5,7 +5,7 @@ date: '2023-07-04'
 output: html_document
 ---
 
-```{r pacotes_db, echo= FALSE}
+```{r pacotes_db, echo= FALSE, include = FALSE}
 # Pacotes -----------------------------------------------------------------
 library(beepr)
 library(tidyverse)
@@ -16,6 +16,7 @@ library(sjmisc)
 library(careless)
 library(readxl)
 library(ggthemes)
+library(formattable)
 ```
 
 ```{r include = FALSE}
@@ -60,15 +61,16 @@ names(bfi_fake)
 ```
 
 ## Passo 4: Verificar quantidade de variáveis por instrumento
-```{r echo=FALSE}
+- Existem 25 variáveis do instrumento sobre personalidade, sendo: a) cinco perguntas sobre amabilidade, b) cinco perguntas sobre extroversão; c) cinco perguntas sobre conscienciosidade; d) cinco perguntas sobre neuroticismo; e) cinco perguntas sobre abertura. 
+```{r echo=FALSE, include = FALSE}
 # Número de itens do BFI
 bfi_fake %>% 
   select(A1:O5)
 ```
 
-**Ponto de atenção 1**: os nomes de variáveis com caixa alta ou espaço entre elas. A função clean_names() será usada para ajustar os nomes.
-**Ponto de atenção 2**: as características pessoais estão fora de ordem no banco de dados. A função relocate será usada para reordenar o banco de dados.
-**Ponto de atenção 3**: a variável ID está com o nome de identidade. A função rename será usada para modificar o nome.
+**Ponto de atenção 1**: os nomes de variáveis com caixa alta ou espaço entre elas. A função clean_names() será usada para ajustar os nomes. </br>
+**Ponto de atenção 2**: as características pessoais estão fora de ordem no banco de dados. A função relocate será usada para reordenar o banco de dados. </br>
+**Ponto de atenção 3**: a variável ID está com o nome de identidade. A função rename será usada para modificar o nome. </br>
 
 ```{r echo=FALSE, include=FALSE}
 # Ponto de atenção 1: nomes de variáveis com caixa alta ou espaço entre elas
@@ -84,48 +86,65 @@ bfi_fake <- bfi_fake %>%
 
 ```
 
-**Ajustes de acordo com pontos de atenção 1, 2 e 3**
+**Ajustes realizados de acordo com pontos de atenção 1, 2 e 3:** </br>
 ```{r echo=FALSE}
 names(bfi_fake)
 ```
 
-## Passo 5 e 6: Checar tipos das variáveis/colunas e variável de id
+## Passo 5 e 6: Checar tipos das variáveis/colunas e variável de id </br>
+
 Checar tipos das variáveis/colunas
 ```{r echo=FALSE}
 glimpse(bfi_fake)
 ```
-
+</br>
 **Ponto de atenção 4**: as variáveis idade, wb e mh foram identificadas como character pelo R. 
+
 - Distribuição da variável idade está normal e sem valores desconhecidos. A transformação usando a função as.numeric será feita.
+
 ```{r echo=FALSE}
 # Investigação sobre a variável idade
-frq(bfi_fake$idade)
+table_idade <- frq(bfi_fake$idade)
+table_idade <- table_idade %>% 
+  as.data.frame() %>% 
+  dplyr::select(-variable, -label) 
+
+formattable(table_idade)
 
 bfi_fake$idade <- as.numeric(bfi_fake$idade)
+
 ```
 
 - Distribuição da variável mh tem um valor desconhecido, "x". A transformação usando a função as.numeric será feita após usar a função mutate + na_if.
-```{r echo=FALSE}
+
+```{r echo=FALSE, message= FALSE}
 #Investigação sobre a variável mh
-frq(bfi_fake$mh)
+table_mh <- frq(bfi_fake$mh)
+table_mh <- table_mh %>% 
+  as.data.frame() %>% 
+  dplyr::select(-variable, -label) 
+
+formattable(table_mh)
 
 bfi_fake<- bfi_fake %>% 
   mutate(mh = na_if(mh, "x"))
-
-frq(bfi_fake$mh)
 
 bfi_fake$mh <- as.numeric(bfi_fake$mh)
 ```
 
 - Distribuição da variável mh tem um valor desconhecido, "x". A transformação usando a função as.numeric será feita após usar a função mutate + na_if.
-```{r echo=FALSE}
+
+```{r echo=FALSE, message = FALSE}
 # Investigação sobre a variável wb
-frq(bfi_fake$wb)
+table_wb <- frq(bfi_fake$wb)
+table_wb <- table_wb %>% 
+  as.data.frame() %>% 
+  dplyr::select(-variable, -label) 
+
+formattable(table_wb)
 
 bfi_fake<- bfi_fake %>% 
   mutate(wb = na_if(wb, "x"))
-
-frq(bfi_fake$wb)
 
 bfi_fake$wb <- as.numeric(bfi_fake$wb)
 ```
@@ -133,9 +152,9 @@ bfi_fake$wb <- as.numeric(bfi_fake$wb)
 ## Passo 7: Verificar observações/linhas duplicadas 
 - Foram encontrados dois casos duplicados de acordo com a variável id: 2801 e 2804. A partir dessa informação foi identificado o id_estudo para verificar se foi imputado de forma igual, oq ue foi o caso. Aqui, pode ser hipotetizado que houve uma falha no sistema que gravou a resposta de uma mesma pessoas duas vezes. 
 
-- Casos removidos com base em id_estudo: 2805 e 2806
+- Casos removidos com base em id_estudo: **2805 e 2806**.
 
-```{r eval=TRUE, echo=FALSE}
+```{r echo=FALSE, include = FALSE}
 # Checagem de dados duplicados sem a variável id 
 get_dupes(bfi_fake, -id)
 
@@ -151,24 +170,30 @@ bfi_fake <- bfi_fake %>%
   filter(!id %in% c("2805", "2806"))
 ```
 
-## Passo 8: Checar respostas descuidadas
+## Passo 8: Checagem respostas descuidadas
 
 ### Pacote careless e respostas repetidas
 
 **Resultado:** Por volta de **0.28%** dos participantes respondeu da mesma forma em mais da metade do questionário. Esses participantes serão removidos da amostra.
 
-```{r eval=TRUE, echo=FALSE, include = FALSE}
+```{r echo=FALSE, include = FALSE}
 bfi_fake_careless <- bfi_fake %>% 
   select(id, a1:o5)
 
 bfi_fake_careless$careless <- longstring(bfi_fake_careless, avg = FALSE)
 ```
 
-```{r eval=TRUE, echo=FALSE}
-frq(bfi_fake_careless$careless)
+```{r echo=FALSE}
+table_careless <- frq(bfi_fake_careless$careless)
+table_careless <- table_careless %>% 
+  as.data.frame() %>% 
+  dplyr::select(-variable, -label) 
+
+formattable(table_careless)
+
 ```
 
-```{r eval=TRUE, echo=FALSE, include = FALSE}
+```{r echo=FALSE, include = FALSE}
 bfi_fake_careless %>% 
   filter(careless > 10)
 
@@ -176,11 +201,11 @@ bfi_fake <- bfi_fake %>%
   filter(!id %in% c("562", "1430", "1555", "2043", "2801", "2802", "2803", "2804"))
 ```
 
-### Extra: Tempo de resposta
-- Em média, as pessoas demoraram por volta de 15 minutos para responder ao questionário, variando entre 1 e 30 minutos.
+### Tempo de resposta do survey
+- Em média, as pessoas demoraram por volta de **15 minutos** para responder ao questionário, variando entre 1 e 30 minutos.
 
-```{r eval=TRUE, echo=FALSE}
-skimr::skim(bfi_fake$duracao_minutos)
+```{r eval=TRUE, echo=FALSE, message=FALSE}
+#skimr::skim(bfi_fake$duracao_minutos)
 
 bfi_fake %>%
   ggplot(aes(x=duracao_minutos)) +
@@ -189,7 +214,7 @@ bfi_fake %>%
   labs(fill="")
 ```
 
-### Extra: Calcular respostas descuidadas via média e DP
+### Cálculo respostas descuidadas via média e DP
 - Essa visualização permite identificar casos com médias altas ou baixas com baixo DP. O que quer dizer que são casos que não estão variando suas respostas de forma substancial. Isso é um indicador de atenção para o pesquisador. 
 
 ```{r eval=TRUE, echo=FALSE, include = FALSE}
@@ -235,32 +260,45 @@ ggplot(bfi_fake, aes(x=bloco2, y=sd_bloco2)) +
 ```
 
 ## Passo 9: Checar dados socioeconômicos relevantes que atendam critérios de amostragem (e.g. idade mínima ou máxima)
-
-- Gênero
+</br>
+- Gênero (1 = meninos, 2 = meninas) </br>
 ```{r eval=TRUE, echo=FALSE}
-frq(bfi_fake$genero)
-```
+table_genero <- frq(bfi_fake$genero)
+table_genero <- table_genero %>% 
+  as.data.frame() %>% 
+  dplyr::select(-variable, -label) 
 
-- Escolaridade
+formattable(table_genero)
+
+```
+</br>
+- Escolaridade (1 = HS, 2 = finished HS, 3 = some college, 4 = college graduate 5 = graduate degree) </br>
 ```{r eval=TRUE, echo=FALSE}
-frq(bfi_fake$education)
-```
+table_education <- frq(bfi_fake$education)
+table_education <- table_education %>% 
+  as.data.frame() %>% 
+  dplyr::select(-variable, -label) 
 
-- Distribuição da idade
-**Importante:** o estudo se refere apenas a população adulta, portanto, participantes com menos de 18 anos foram retirados da amostra, resultado em N = 2545 para as análises de dados.
-```{r eval=TRUE, echo=FALSE}
-skimr::skim(bfi_fake$idade)
-```
+formattable(table_education)
 
-```{r eval=TRUE, echo=FALSE, include = FALSE}
+```
+ </br>
+- Distribuição da idade </br>
+
+**Importante:** o estudo se refere apenas a população adulta, portanto, participantes com menos de 18 anos foram retirados da amostra, resultado em *N = 2545* para as análises de dados.
+
+```{r echo=FALSE, include = FALSE}
 # Criterio de seleção: Manter apenas estudantes com 18 anos ou mais
 bfi_fake <- bfi_fake %>%   
   filter(idade >= 18)
+```
 
+```{r echo=FALSE}
 skimr::skim(bfi_fake$idade)
 ```
 
-# Considerações
-- O banco de dados foi salvo na pasta data, seguindo as boas práticas de R.
+### Considerações
+- O banco de dados foi salvo na pasta data, seguindo as boas práticas de R e com nome *bfi_fake.RDS*.
+- O tamanho da amostra final é *N = 2545 participantes.*
 
 
